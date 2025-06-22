@@ -1,19 +1,21 @@
 package com.example.reconciliation.entity;
 
-import jakarta.persistence.*;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "settlement_report")
 public class SettlementReport {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-
     private String reportId;
     private BigDecimal totalAmount;
-    private String status; // e.g., PENDING, COMPLETED
+    private String currency;
+    private String status;
     private LocalDateTime createdAt;
     private String merchantId;
 
@@ -24,6 +26,8 @@ public class SettlementReport {
     public void setReportId(String reportId) { this.reportId = reportId; }
     public BigDecimal getTotalAmount() { return totalAmount; }
     public void setTotalAmount(BigDecimal totalAmount) { this.totalAmount = totalAmount; }
+    public String getCurrency() { return currency; }
+    public void setCurrency(String currency) { this.currency = currency; }
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
     public LocalDateTime getCreatedAt() { return createdAt; }

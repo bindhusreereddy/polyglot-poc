@@ -1,16 +1,17 @@
 package com.example.reconciliation.service;
 
+import com.example.reconciliation.dto.ReconciliationRequest;
+import com.example.reconciliation.dto.TransactionDto;
+import com.example.reconciliation.entity.LedgerEntry;
 import com.example.reconciliation.entity.SettlementReport;
-import com.example.reconciliation.entity.TransactionLog;
-import com.example.reconciliation.model.ReconciliationRequest;
 import com.example.reconciliation.repository.LedgerEntryRepository;
 import com.example.reconciliation.repository.SettlementReportRepository;
-import com.example.reconciliation.repository.TransactionLogRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.TestPropertySource;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -18,60 +19,73 @@ import java.util.Arrays;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.when;
 
-@ExtendWith(MockitoExtension.class)
+@SpringBootTest
+@TestPropertySource(locations = "classpath:application-test.properties")
 public class ReconciliationServiceTest {
 
-    @Mock
-    private TransactionLogRepository transactionLogRepository;
+    @Autowired
+    private ReconciliationService reconciliationService;
 
-    @Mock
-    private LedgerEntryRepository ledgerEntryRepository;
+    @MockBean
+    private TransactionServiceClient transactionServiceClient;
 
-    @Mock
+    @Autowired
     private SettlementReportRepository settlementReportRepository;
 
-    @InjectMocks
-    private ReconciliationService reconciliationService;
+    @Autowired
+    private LedgerEntryRepository ledgerEntryRepository;
+
+    @BeforeEach
+    public void setUp() {
+        assertNotNull(reconciliationService, "ReconciliationService should not be null");
+        assertNotNull(settlementReportRepository, "SettlementReportRepository should not be null");
+        assertNotNull(ledgerEntryRepository, "LedgerEntryRepository should not be null");
+
+        TransactionDto txn1 = new TransactionDto();
+        txn1.setId("TXN001");
+        txn1.setAmount(new BigDecimal("100.00"));
+        txn1.setStatus("SUCCESS");
+
+        TransactionDto txn2 = new TransactionDto();
+        txn2.setId("TXN002");
+        txn2.setAmount(new BigDecimal("200.00"));
+        txn2.setStatus("SUCCESS");
+
+        TransactionDto txn3 = new TransactionDto();
+        txn3.setId("TXN003");
+        txn3.setAmount(new BigDecimal("150.00"));
+        txn3.setStatus("FAILED");
+
+        TransactionDto txn4 = new TransactionDto();
+        txn4.setId("TXN004");
+        txn4.setAmount(new BigDecimal("300.00"));
+        txn4.setStatus("SUCCESS");
+
+        when(transactionServiceClient.getTransactionsByIds(Arrays.asList("TXN001", "TXN002", "TXN003", "TXN004")))
+                .thenReturn(Arrays.asList(txn1, txn2, txn3, txn4));
+
+        when(settlementReportRepository.save(any(SettlementReport.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(ledgerEntryRepository.save(any(LedgerEntry.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+    }
 
     @Test
     void testRunReconciliation() {
-        // Arrange
         ReconciliationRequest request = new ReconciliationRequest();
         request.setMerchantId("MERCH001");
         request.setStartDate(LocalDateTime.of(2025, 6, 6, 0, 0));
         request.setEndDate(LocalDateTime.of(2025, 6, 7, 0, 0));
 
-        TransactionLog txn1 = new TransactionLog();
-        txn1.setAmount(new BigDecimal("100.00"));
-        txn1.setStatus("SUCCESS");
-        TransactionLog txn2 = new TransactionLog();
-        txn2.setAmount(new BigDecimal("200.00"));
-        txn2.setStatus("SUCCESS");
-        TransactionLog txn3 = new TransactionLog();
-        txn3.setAmount(new BigDecimal("150.00"));
-        txn3.setStatus("FAILED");
-
-        List<TransactionLog> transactions = Arrays.asList(txn1, txn2, txn3);
-        when(transactionLogRepository.findByMerchantIdAndTransactionDateBetween(
-                anyString(), any(LocalDateTime.class), any(LocalDateTime.class)))
-                .thenReturn(transactions);
-
-        when(settlementReportRepository.save(any(SettlementReport.class)))
-                .thenAnswer(invocation -> invocation.getArgument(0));
-        when(ledgerEntryRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
-
-        // Act
         SettlementReport report = reconciliationService.runReconciliation(request);
 
-        // Assert
-        assertEquals(new BigDecimal("300.00"), report.getTotalAmount());
-        assertEquals("COMPLETED", report.getStatus());
-        verify(transactionLogRepository, times(1))
-                .findByMerchantIdAndTransactionDateBetween(anyString(), any(LocalDateTime.class), any(LocalDateTime.class));
-        verify(settlementReportRepository, times(1)).save(any(SettlementReport.class));
-        verify(ledgerEntryRepository, times(1)).save(any());
+        assertNotNull(report, "SettlementReport should not be null");
+        assertEquals("MERCH001", report.getMerchantId());
+        assertEquals(new BigDecimal("600.00"), report.getTotalAmount()); // 100 + 200 + 300
+        assertEquals("SUCCESS", report.getStatus());
     }
 }

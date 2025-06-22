@@ -10,5 +10,5 @@ func main() {
     db.Init()
     app := fiber.New()
     routes.Setup(app)
-    app.Listen(":8080")
+    app.Listen(":8081")
 }
